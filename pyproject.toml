@@ -1,0 +1,70 @@
+[project]
+name = "humble-steam-key-redeemer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3"
+]
+
+dependencies = [
+    'fuzzywuzzy >= 0.18.0',
+    'requests >= 2.32.5',
+    'selenium >= 4.32.0',
+    'pwinput >= 1.0.3',
+
+    'python-Levenshtein >= 0.27.1',
+
+    'steam @ git+https://github.com/ValvePython/steam@master',
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+select = [
+    # "D", # pydocstyle
+    "E", "W", # pycodestyle
+    "ERA", # eradicate
+    "F", # Pyflakes
+    "I", # isort
+    "N", # pep8-naming
+    "PERF", # perflint
+    "PL", # Pylint
+    "RUF", # Ruff-specific rules
+    "UP", # pyupgrade
+    "A", # flake8-builtins
+    "ANN", # flake8-annotations
+    "ARG", # flake8-unused-arguments
+    "B", # flake8-bugbear
+    "BLE", # flake8-blind-except
+    "C4", # flake8-comprehensions
+    "DTZ", # flake8-datetimez
+    "FBT", # flake8-boolean-trap
+    "ICN", # flake8-import-conventions
+    "ISC", # flake8-implicit-str-concat
+    "LOG", # flake8-logging
+    "PTH", # flake8-use-pathlib
+    "PIE", # flake8-pie
+    "PT", # flake8-pytest-style
+    "RET", # flake8-return
+    "SIM", # flake8-simplify
+    "T20", # flake8-print
+]
+unfixable = ["F401"]
+ignore = [
+    "ANN002", "ANN003", "ANN401", # Missing type for args, kwargs, and disallowal of `Typing.Any`
+    "D100", "D104", "D105", "D107", # Undocumented module, package, magic methods, and init
+    "PERF203", # try-except in loop
+    "RET504" # Unnecessary assignment before return statement
+]
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = true # PT001
+mark-parentheses = true # PT023
+[tool.ruff.lint.pydocstyle]
+convention = "google" # Google-style docstrings
+
+[tool.uv]
+native-tls = true
