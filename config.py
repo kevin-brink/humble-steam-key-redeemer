@@ -10,6 +10,6 @@ LOGGER_NAME = "humble_steam_key_redeemer"
 log_path = Path("_logs").resolve()
 log_path.mkdir(exist_ok=True, parents=True)
 start_time = datetime.now(UTC)
-log_file = log_path / start_time.strftime("hkr_%Y%m%d_%H%M%S.log")
+LOG_FILE = log_path / start_time.strftime("hkr_%Y%m%d_%H%M%S")
 logger = logging.getLogger(LOGGER_NAME)
-logging.basicConfig(filename=log_file, level=logging.DEBUG, encoding="utf-8")
+logging.basicConfig(filename=LOG_FILE.with_suffix(".log"), level=logging.DEBUG)

@@ -1,4 +1,5 @@
 import atexit
+import base64
 import json
 import logging
 import os
@@ -7,7 +8,6 @@ import signal
 import sys
 import time
 import webbrowser
-from base64 import b64encode
 from collections.abc import Generator
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -21,9 +21,11 @@ from fuzzywuzzy import fuzz
 from pwinput import pwinput
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
+from selenium.webdriver.common.by import By
 from selenium.webdriver.common.options import ArgOptions
 from selenium.webdriver.remote.webdriver import WebDriver
 
+import config
 from config import logger
 from helpers import log_exception_wrapper
 
@@ -79,18 +81,28 @@ def find_dict_keys(node: list | dict, kv: str, *, parent: bool = False) -> Gener
 
 js_path = Path("js_scripts").resolve()
 get_humble_orders = (js_path / "get_humble_orders.js").read_text()
-fetch_cmd = (js_path / "fetch_cmd.js").read_text()
 
 
 def perform_post(driver: WebDriver, url: str, payload: dict) -> None:
-    json_payload = b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
-    csrf = driver.get_cookie("csrf_cookie")
-    csrf = csrf["value"] if csrf is not None else ""
-    if csrf is None:
-        csrf = ""
+    json_payload = base64.b64encode(json.dumps(payload).encode("utf-8")).decode("ascii")
 
-    script = fetch_cmd.format(formData=json_payload, url=url, csrf=csrf)
-    return driver.execute_async_script(script)
+    # double check encoding
+    decoded = json.loads(base64.b64decode(json_payload).decode("utf-8"))
+    assert decoded == payload, "Payload encoding/decoding failed"
+
+    csrf = driver.get_cookie("csrf_cookie") or {}
+    csrf = csrf.get("value") or ""
+
+    with (js_path / "fetch_cmd.js").open() as f:
+        fetch_cmd = f.read()
+
+    driver.set_script_timeout(60)
+    try:
+        return driver.execute_async_script(fetch_cmd, json_payload, url, csrf)
+    except WebDriverException as ex:
+        logger.exception("Error occurred while performing POST request", exc_info=ex)
+        driver.save_screenshot(config.LOG_FILE.with_suffix(".png"))
+        raise ex
 
 
 def process_quit(driver: WebDriver) -> None:
@@ -120,9 +132,9 @@ def get_headless_driver() -> WebDriver:
         try:
             options = driver_choice.driver_options()
             if driver_choice.driver_class == webdriver.Chrome:
-                options.add_argument("--headless=new")
-            else:
-                options.add_argument("--headless")
+                # options.add_argument("--headless")
+                options.add_argument("--no-sandbox")
+                options.add_argument("--disable-dev-shm-usage")
             driver = driver_choice.driver_class(options=options)
             process_quit(driver)  # make sure driver closes when we close
             return driver
@@ -241,10 +253,9 @@ def verify_logins_session(session: WebDriver | requests.Session) -> list[bool]:
 def do_login(driver: WebDriver, payload: dict) -> tuple[int, dict]:
     auth, login_json = perform_post(driver, HUMBLE_LOGIN_API, payload)
     if auth not in (200, 401):
-        print(
-            f"humblebundle.com has responded with an error (HTTP status code {auth}: {responses[auth]})."
-        )
-        time.sleep(30)
+        msg = f"Humble Bundle returned an error (HTTP code {auth}: {responses[auth]})."
+        print(msg)
+        logger.error(msg)
         sys.exit()
     return auth, login_json
 
@@ -252,6 +263,14 @@ def do_login(driver: WebDriver, payload: dict) -> tuple[int, dict]:
 def humble_login(driver: WebDriver) -> bool:
     cls()
     driver.get(HUMBLE_LOGIN_PAGE)
+
+    # Dismiss modal if present
+    time.sleep(3)
+    consent_buttons = driver.find_elements(By.ID, "onetrust-accept-btn-handler")
+    if consent_buttons:
+        consent_buttons[0].click()
+        time.sleep(1)
+
     # Attempt to use saved session
     if (
         try_recover_cookies(".humblecookies", driver)
@@ -976,6 +995,7 @@ def cls():
 
 def print_main_header():
     print("-=FailSpy's Humble Bundle Helper!=-")
+    print("    Made usable by kevin-brink.    ")
     print("--------------------------------------")
 
 
